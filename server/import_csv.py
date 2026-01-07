@@ -1,25 +1,124 @@
+import argparse
 import pandas as pd
 import os
 import sys
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 from dotenv import load_dotenv
+from urllib.parse import urlparse, urlunparse
+
+try:
+    import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
 
 # Configuration
 load_dotenv()
-CSV_FILE = "sample_data.csv"  # Update with your CSV file path
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 CHUNK_SIZE = 10000  # Process 10k rows at a time
 FIELDS = [
-    "cytokine_name",
-    "cell_type",
-    "cytokine_effect",
-    "causality_type",
-    "species",
-    "chunk_id",
-    "key_sentences",
-    "citation_id"
-]
+    'chunk_id', 'key_sentences', 'cell_type', 'cell_type_id', 'cytokine_name', 'cytokine_name_original',
+    'confidence_score', 'cytokine_effect', 'cytokine_effect_original',
+    'regulated_genes', 'gene_response_type', 'regulated_pathways', 'pathway_response_type',
+    'regulated_proteins', 'protein_response_type',
+    'species', 'necessary_condition', 'experimental_concentration', 'experimental_perturbation', 'experimental_readout',
+    'experimental_readout_original', 'experimental_system', 'experimental_system_details', 'experimental_system_original',
+    'experimental_system_type', 'experimental_time_point', 'regulated_cell_processes', 'regulated_cell_processes_original',
+    'causality_type', 'causality_description', 'publication_type', 'mapped_citation_id']
+
+def ensure_database_exists(database_url):
+    """Create the database if it doesn't exist"""
+    try:
+        # Parse the database URL
+        parsed = urlparse(database_url)
+        db_name = parsed.path.lstrip('/')
+        
+        if not db_name:
+            print("⚠ Warning: No database name found in DATABASE_URL")
+            return database_url
+        
+        # Create a connection URL to the default 'postgres' database
+        default_db_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            '/postgres',  # Connect to default postgres database
+            parsed.params,
+            parsed.query,
+            parsed.fragment
+        ))
+        
+        # Try to connect to the target database first
+        try:
+            test_engine = create_engine(database_url)
+            with test_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print(f"✓ Database '{db_name}' already exists")
+            return database_url
+        except OperationalError as e:
+            # Check if the error is specifically about database not existing
+            error_msg = str(e).lower()
+            if 'does not exist' in error_msg or 'database' in error_msg and 'not exist' in error_msg:
+                # Database doesn't exist, create it
+                print(f"Database '{db_name}' does not exist. Creating it...")
+            else:
+                # Some other connection error - re-raise it
+                raise
+            
+            # Connect to default postgres database to create the new database
+            if not PSYCOPG2_AVAILABLE:
+                print(f"⚠ Warning: psycopg2 not available. Cannot auto-create database.")
+                print(f"  Please create the database manually:")
+                print(f"  createdb {db_name}")
+                return database_url
+            
+            # Parse connection details for psycopg2
+            parsed_default = urlparse(default_db_url)
+            conn_params = {
+                'host': parsed_default.hostname,
+                'port': parsed_default.port or 5432,
+                'user': parsed_default.username,
+                'password': parsed_default.password,
+                'database': 'postgres'
+            }
+            
+            # Remove None values
+            conn_params = {k: v for k, v in conn_params.items() if v is not None}
+            
+            try:
+                conn = psycopg2.connect(**conn_params)
+                conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+                cursor = conn.cursor()
+                
+                # Check if database exists
+                cursor.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s",
+                    (db_name,)
+                )
+                if cursor.fetchone():
+                    print(f"✓ Database '{db_name}' already exists")
+                else:
+                    # Create the database
+                    # Escape the database name (psycopg2 will handle quoting)
+                    cursor.execute(f'CREATE DATABASE "{db_name}"')
+                    print(f"✓ Created database '{db_name}'")
+                
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"⚠ Warning: Could not create database: {e}")
+                print(f"  You may need to create the database manually:")
+                print(f"  createdb {db_name}")
+                # Continue anyway - the connection attempt will show the actual error
+            return database_url
+            
+    except Exception as e:
+        print(f"⚠ Warning: Could not ensure database exists: {e}")
+        print("  Attempting to continue with existing connection...")
+        return database_url
 
 def create_tables(engine):
     """Create the interactions table with proper schema"""
@@ -28,14 +127,38 @@ def create_tables(engine):
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS public.cytokine_effects (
         id BIGSERIAL PRIMARY KEY,
-        cytokine_name VARCHAR(500),
-        cell_type VARCHAR(500),
-        cytokine_effect TEXT,
-        causality_type VARCHAR(500),
-        species VARCHAR(500),
-        chunk_id VARCHAR(500),
+        chunk_id TEXT,
         key_sentences TEXT,
-        citation_id VARCHAR(500)
+        cell_type TEXT,
+        cell_type_id TEXT,
+        cytokine_name TEXT,
+        cytokine_name_original TEXT,
+        confidence_score FLOAT,
+        cytokine_effect TEXT,
+        cytokine_effect_original TEXT,
+        regulated_genes TEXT,
+        gene_response_type TEXT,
+        regulated_pathways TEXT,
+        pathway_response_type TEXT,
+        regulated_proteins TEXT,
+        protein_response_type TEXT,
+        species TEXT,
+        necessary_condition TEXT,
+        experimental_concentration TEXT,
+        experimental_perturbation TEXT,
+        experimental_readout TEXT,
+        experimental_readout_original TEXT,
+        experimental_system TEXT,
+        experimental_system_details TEXT,
+        experimental_system_original TEXT,
+        experimental_system_type TEXT,
+        experimental_time_point TEXT,
+        regulated_cell_processes TEXT,
+        regulated_cell_processes_original TEXT,
+        causality_type TEXT,
+        causality_description TEXT,
+        publication_type TEXT,
+        mapped_citation_id TEXT
     );
     """
     
@@ -53,7 +176,6 @@ def create_indexes(engine):
         "CREATE INDEX IF NOT EXISTS idx_cytokine_name ON cytokine_effects(cytokine_name);",
         "CREATE INDEX IF NOT EXISTS idx_cell_type ON cytokine_effects(cell_type);",
         "CREATE INDEX IF NOT EXISTS idx_species ON cytokine_effects(species);",
-        "CREATE INDEX IF NOT EXISTS idx_causality_type ON cytokine_effects(causality_type);",
         "CREATE INDEX IF NOT EXISTS idx_experimental_system_type ON cytokine_effects(experimental_system_type);",
         "CREATE INDEX IF NOT EXISTS idx_publication_type ON cytokine_effects(publication_type);",
         "CREATE INDEX IF NOT EXISTS idx_confidence_score ON cytokine_effects(confidence_score);",
@@ -127,34 +249,34 @@ def verify_import(engine):
         for row in result:
             print(f"  Cytokine: {row[0]}, Cell Type: {row[1]}, Species: {row[2]}")
 
-def main():
+def main(args):
     print("=" * 60)
     print("Cytokine Knowledgebase - CSV Import Tool")
     print("=" * 60)
     print()
+    csv_file = args.file
+    assert csv_file.endswith(".csv"), "CSV file is required"
+    assert os.path.exists(csv_file), f"CSV file {csv_file} does not exist"
+
+    # Ensure database exists
+    if not DATABASE_URL:
+        print("❌ Error: DATABASE_URL environment variable is not set!")
+        sys.exit(1)
     
+    print("Checking database connection...")
+    database_url = ensure_database_exists(DATABASE_URL)
+    print()
+
     # Create engine
     try:
-        engine = create_engine(DATABASE_URL)
-        print(f"✓ Connected to database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'local'}")
+        engine = create_engine(database_url)
+        # Test connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        print(f"✓ Connected to database: {database_url.split('@')[1] if '@' in database_url else 'local'}")
     except Exception as e:
         print(f"❌ Error connecting to database: {str(e)[:100]}")
         sys.exit(1)
-    
-    # Check if CSV file exists
-    if not os.path.exists(CSV_FILE):
-        print(f"❌ Error: CSV file '{CSV_FILE}' not found!")
-        print(f"Please update CSV_FILE path in the script or set it as an environment variable.")
-        sys.exit(1)
-    
-    print()
-    
-    # # Confirm before proceeding
-    # response = input(f"This will import data from '{CSV_FILE}' into the database.\nProceed? (yes/no): ")
-    # if response.lower() not in ['yes', 'y']:
-    #     print("Import cancelled.")
-    #     sys.exit(0)
-    
     print()
     
     # Execute import steps
@@ -164,7 +286,7 @@ def main():
         print()
         
         # Step 2: Import CSV data
-        import_csv(CSV_FILE, engine)
+        import_csv(csv_file, engine)
         print()
         
         # Step 3: Create indexes
@@ -188,4 +310,7 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Import CSV file into PostgreSQL database")
+    parser.add_argument("--file", "-f", type=str, default="sample_data.csv", help="Path to the CSV file to import")
+    args = parser.parse_args()
+    main(args)

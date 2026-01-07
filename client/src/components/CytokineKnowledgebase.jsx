@@ -17,18 +17,42 @@ const CytokineKnowledgebase = () => {
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
   // Column visibility
-  const defaultVisibleColumns = ['cytokine_name', 'cell_type', 'species', 'causality_type', 'cytokine_effect', 'regulated_genes', 'chunk_id', 'key_sentences', 'citation_id'];
+  const defaultVisibleColumns = ['cytokine_name', 'cell_type', 'species', 'causality_type', 'cytokine_effect', 'regulated_genes', 'chunk_id', 'key_sentences'];
   const [visibleColumns, setVisibleColumns] = useState(defaultVisibleColumns);
   
   const allColumns = [
-    "cytokine_name",
-    "cell_type",
-    "cytokine_effect",
-    "causality_type",
-    "species",
     "chunk_id",
     "key_sentences",
-    "citation_id"
+    "cell_type",
+    "cell_type_id",
+    "cytokine_name",
+    "cytokine_name_original",
+    "confidence_score",
+    "cytokine_effect",
+    "cytokine_effect_original",
+    "regulated_genes",
+    "gene_response_type",
+    "regulated_pathways",
+    "pathway_response_type",
+    "regulated_proteins",
+    "protein_response_type",
+    "species",
+    "necessary_condition",
+    "experimental_concentration",
+    "experimental_perturbation",
+    "experimental_readout",
+    "experimental_readout_original",
+    "experimental_system",
+    "experimental_system_details",
+    "experimental_system_original",
+    "experimental_system_type",
+    "experimental_time_point",
+    "regulated_cell_processes",
+    "regulated_cell_processes_original",
+    "causality_type",
+    "causality_description",
+    "publication_type",
+    "mapped_citation_id",
 ];
 
   const filterableColumns = [
@@ -36,8 +60,6 @@ const CytokineKnowledgebase = () => {
     { key: 'cell_type', label: 'Cell Type' },
     { key: 'species', label: 'Species' },
     { key: 'causality_type', label: 'Causality Type' },
-    { key: 'experimental_system_type', label: 'Experimental System' },
-    { key: 'publication_type', label: 'Publication Type' }
   ];
 
   // Fetch data
@@ -159,11 +181,11 @@ const CytokineKnowledgebase = () => {
     <div>
       {/* Header */}
       <div className="container">
-        <div className="px-6 py-8">
-          <h1 className="text-4xl font-bold mb-2">Cytokine Interactions Knowledgebase</h1>
-          <p className="text-gray-400">Explore cytokine-cell interactions from PMC literature</p>
+        <div className="px-6 py-6">
+          <h1 className="text-4xl font-bold mb-2 font-sans">Cytokine Effects Knowledge Base</h1>
+          <p className="text-gray-400">Explore cytokine-cell interactions extracted from full text PubMed Central papers</p>
           
-          {stats && (
+          {/* {stats && (
             <div className="grid grid-cols-4 gap-4 mt-6">
               <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
                 <div className="text-2xl font-bold">{stats.total_interactions?.toLocaleString()}</div>
@@ -182,13 +204,13 @@ const CytokineKnowledgebase = () => {
                 <div className="text-sm text-gray-400">Species</div>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
       <div className="px-6 py-6">
         {/* Search and Controls */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white">
           <div className="mb-4 space-y-4">
             {/* Search bar */}
             <div className="relative">
@@ -292,7 +314,7 @@ const CytokineKnowledgebase = () => {
         </div>
 
         {/* Data Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white shadow-md overflow-x-auto">
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -301,7 +323,7 @@ const CytokineKnowledgebase = () => {
           ) : (
             <>
               <div className="w-full overflow-x-auto">
-                <table className="w-full table-fixed">
+                <table className="w-full">
                   <thead className="bg-gray-100 border-b border-gray-200">
                     <tr>
                       {visibleColumns.map(col => (
