@@ -1,0 +1,8 @@
+*.out
+*.csv
+*.dump
+*.log
+.env
+
+__pycache__/
+data/
