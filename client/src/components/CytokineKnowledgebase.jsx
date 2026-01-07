@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, ChevronLeft, ChevronRight, X, Settings } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://cytokine-effects-kb-production.up.railway.app';
 
 const CytokineKnowledgebase = () => {
   const [data, setData] = useState([]);
@@ -90,16 +90,6 @@ const CytokineKnowledgebase = () => {
     }
   };
 
-  // Fetch stats
-  const fetchStats = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/stats`);
-      const result = await response.json();
-      setStats(result);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   // Fetch filter options for a column
   const fetchFilterOptions = async (column) => {
@@ -113,10 +103,6 @@ const CytokineKnowledgebase = () => {
       console.error(`Error fetching filter options for ${column}:`, error);
     }
   };
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
 
   useEffect(() => {
     fetchData(1);
@@ -184,27 +170,6 @@ const CytokineKnowledgebase = () => {
         <div className="px-6 py-6">
           <h1 className="text-4xl font-bold mb-2 font-sans">Cytokine Effects Knowledge Base</h1>
           <p className="text-gray-400">Explore cytokine-cell interactions extracted from full text PubMed Central papers</p>
-          
-          {/* {stats && (
-            <div className="grid grid-cols-4 gap-4 mt-6">
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                <div className="text-2xl font-bold">{stats.total_interactions?.toLocaleString()}</div>
-                <div className="text-sm text-gray-400">Total Interactions</div>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                <div className="text-2xl font-bold">{stats.unique_cytokines?.toLocaleString()}</div>
-                <div className="text-sm text-gray-400">Unique Cytokines</div>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                <div className="text-2xl font-bold">{stats.unique_cell_types?.toLocaleString()}</div>
-                <div className="text-sm text-gray-400">Cell Types</div>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                <div className="text-2xl font-bold">{stats.unique_species?.toLocaleString()}</div>
-                <div className="text-sm text-gray-400">Species</div>
-              </div>
-            </div>
-          )} */}
         </div>
       </div>
 
