@@ -29,7 +29,7 @@ pg_restore \
 ### Run app
 Start FastAPI server:
 ```
-python server/app.py
+python server/main.py
 ```
 
 Start React frontend: 
