@@ -35,6 +35,7 @@ python server/app.py
 Start React frontend: 
 ```
 cd client
+npm install
 npm run dev
 ```
 
