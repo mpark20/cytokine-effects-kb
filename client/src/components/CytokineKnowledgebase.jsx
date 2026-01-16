@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, ChevronLeft, ChevronRight, X, Settings } from 'lucide-react';
 
+// const API_BASE_URL = 'http://localhost:8000';
 const API_BASE_URL = 'https://cytokine-effects-kb-production.up.railway.app';
 
 const CytokineKnowledgebase = () => {
@@ -9,7 +10,6 @@ const CytokineKnowledgebase = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, total_pages: 0 });
   const [filters, setFilters] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [stats, setStats] = useState(null);
   
   // Available filter columns
   const [filterOptions, setFilterOptions] = useState({});
@@ -17,7 +17,7 @@ const CytokineKnowledgebase = () => {
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
   // Column visibility
-  const defaultVisibleColumns = ['cytokine_name', 'cell_type', 'species', 'causality_type', 'cytokine_effect', 'regulated_genes', 'chunk_id', 'key_sentences'];
+  const defaultVisibleColumns = ['cytokine_name', 'cell_type', 'species', 'causality_type', 'cytokine_effect', 'regulated_genes', 'chunk_id', 'url'];
   const [visibleColumns, setVisibleColumns] = useState(defaultVisibleColumns);
   
   const allColumns = [
@@ -53,6 +53,7 @@ const CytokineKnowledgebase = () => {
     "causality_description",
     "publication_type",
     "mapped_citation_id",
+    "url",
 ];
 
   const filterableColumns = [
@@ -60,6 +61,9 @@ const CytokineKnowledgebase = () => {
     { key: 'cell_type', label: 'Cell Type' },
     { key: 'species', label: 'Species' },
     { key: 'causality_type', label: 'Causality Type' },
+    { key: 'experimental_system_type', label: 'Experimental System Type' },
+    { key: 'publication_type', label: 'Publication Type' },
+    { key: 'regulated_genes', label: 'Regulated Genes' },
   ];
 
   // Fetch data
@@ -161,6 +165,19 @@ const CytokineKnowledgebase = () => {
     if (!text) return '-';
     const str = String(text);
     return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+  };
+
+  const formatUrlPreview = (url) => {
+    if (!url) return '-';
+    try {
+      const urlObj = new URL(url);
+      // Show domain and path (truncated if too long)
+      const preview = urlObj.hostname + urlObj.pathname;
+      return preview.length > 50 ? preview.substring(0, 50) + '...' : preview;
+    } catch {
+      // If URL parsing fails, just truncate the original string
+      return url.length > 50 ? url.substring(0, 50) + '...' : url;
+    }
   };
 
   return (
@@ -303,7 +320,19 @@ const CytokineKnowledgebase = () => {
                       <tr key={row.id || idx} className="hover:bg-gray-50">
                         {visibleColumns.map(col => (
                           <td key={col} className="px-4 py-3 text-sm text-gray-800 break-words whitespace-normal">
-                            {truncateText(row[col])}
+                            {col === 'url' && row[col] ? (
+                              <a 
+                                href={row[col]} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                title={row[col]}
+                              >
+                                {formatUrlPreview(row[col])}
+                              </a>
+                            ) : (
+                              truncateText(row[col])
+                            )}
                           </td>
                         ))}
                       </tr>
