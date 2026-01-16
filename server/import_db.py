@@ -21,14 +21,35 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 CHUNK_SIZE = 10000  # Process 10k rows at a time
 FIELDS = [
-    'chunk_id', 'key_sentences', 'cell_type', 'cell_type_id', 'cytokine_name', 'cytokine_name_original',
-    'confidence_score', 'cytokine_effect', 'cytokine_effect_original',
-    'regulated_genes', 'gene_response_type', 'regulated_pathways', 'pathway_response_type',
-    'regulated_proteins', 'protein_response_type',
-    'species', 'necessary_condition', 'experimental_concentration', 'experimental_perturbation', 'experimental_readout',
-    'experimental_readout_original', 'experimental_system', 'experimental_system_details', 'experimental_system_original',
-    'experimental_system_type', 'experimental_time_point', 'regulated_cell_processes', 'regulated_cell_processes_original',
-    'causality_type', 'causality_description', 'publication_type', 'mapped_citation_id']
+    "chunk_id",
+    "key_sentences",
+    "cell_type",
+    "cytokine_name",
+    "confidence_score",
+    "cytokine_effect",
+    "cytokine_effect_original",
+    "regulated_genes",
+    "gene_response_type",
+    "regulated_pathways",
+    "pathway_response_type",
+    "regulated_cell_processes",
+    "cell_process_category",
+    "cell_process_response_type",
+    "species",
+    "necessary_condition",
+    "experimental_concentration",
+    "experimental_perturbation",
+    "experimental_readout",
+    "experimental_readout_category",
+    "experimental_system_type",
+    "experimental_system_details",
+    "experimental_time_point",
+    "causality_type",
+    "causality_description",
+    "publication_type",
+    "mapped_citation_id",
+    "url"
+]
 
 def ensure_database_exists(database_url):
     """Create the database if it doesn't exist"""
@@ -130,9 +151,7 @@ def create_tables(engine):
         chunk_id TEXT,
         key_sentences TEXT,
         cell_type TEXT,
-        cell_type_id TEXT,
         cytokine_name TEXT,
-        cytokine_name_original TEXT,
         confidence_score FLOAT,
         cytokine_effect TEXT,
         cytokine_effect_original TEXT,
@@ -140,25 +159,23 @@ def create_tables(engine):
         gene_response_type TEXT,
         regulated_pathways TEXT,
         pathway_response_type TEXT,
-        regulated_proteins TEXT,
-        protein_response_type TEXT,
+        regulated_cell_processes TEXT,
+        cell_process_category TEXT,
+        cell_process_response_type TEXT,
         species TEXT,
         necessary_condition TEXT,
         experimental_concentration TEXT,
         experimental_perturbation TEXT,
         experimental_readout TEXT,
-        experimental_readout_original TEXT,
-        experimental_system TEXT,
-        experimental_system_details TEXT,
-        experimental_system_original TEXT,
+        experimental_readout_category TEXT,
         experimental_system_type TEXT,
+        experimental_system_details TEXT,
         experimental_time_point TEXT,
-        regulated_cell_processes TEXT,
-        regulated_cell_processes_original TEXT,
         causality_type TEXT,
         causality_description TEXT,
         publication_type TEXT,
-        mapped_citation_id TEXT
+        mapped_citation_id TEXT,
+        url TEXT
     );
     """
     
@@ -218,6 +235,8 @@ def import_csv(csv_file, engine):
         for chunk_num, chunk in enumerate(chunk_iterator, 1):
             # Replace NaN with None for proper NULL values in database
             chunk = chunk.where(pd.notnull(chunk), None)
+            chunk["cytokine_name"] = chunk["cytokine_name"].apply(lambda x: x.split(';'))
+            chunk = chunk.explode("cytokine_name").reset_index(drop=True)
             
             # Write to database
             if len(chunk):

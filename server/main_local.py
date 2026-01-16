@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, select, func, or_, and_
+from sqlalchemy import (
+    create_engine, Column, Integer, String, Text, Float,
+    select, func, or_
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from pydantic import BaseModel
@@ -9,27 +12,82 @@ from dotenv import load_dotenv
 import os
 from contextlib import contextmanager
 
+# TODO: 
+# - [DONE] remove metadata with "unknown"
+# - plotting interface 
+
 # Database setup
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+# All available columns
+ALL_COLUMNS = [
+    "id",
+    "chunk_id",
+    "key_sentences",
+    "cell_type",
+    "cytokine_name",
+    "confidence_score",
+    "cytokine_effect",
+    "cytokine_effect_original",
+    "regulated_genes",
+    "gene_response_type",
+    "regulated_pathways",
+    "pathway_response_type",
+    "regulated_cell_processes",
+    "cell_process_category",
+    "cell_process_response_type",
+    "species",
+    "necessary_condition",
+    "experimental_concentration",
+    "experimental_perturbation",
+    "experimental_readout",
+    "experimental_readout_category",
+    "experimental_system_type",
+    "experimental_system_details",
+    "experimental_time_point",
+    "causality_type",
+    "causality_description",
+    "publication_type",
+    "mapped_citation_id",
+    "url",
+]
 
 # Database Model
-# Database Model (pruned)
 class CytokineInteraction(Base):
     __tablename__ = "cytokine_effects"
 
     id = Column(Integer, primary_key=True, index=True)
-    cytokine_name = Column(String(200), index=True)
-    cell_type = Column(String(500), index=True)
-    cytokine_effect = Column(String(500))
-    causality_type = Column(String(200))
-    species = Column(String(200), index=True)
     chunk_id = Column(String(200))
     key_sentences = Column(Text)
-    citation_id = Column(String(200))
+    cell_type = Column(String(500), index=True)
+    cytokine_name = Column(String(200), index=True)
+    confidence_score = Column(Float)
+    cytokine_effect = Column(String(500))
+    cytokine_effect_original = Column(String(500))
+    regulated_genes = Column(Text)
+    gene_response_type = Column(String(200))
+    regulated_pathways = Column(Text)
+    pathway_response_type = Column(String(200))
+    regulated_cell_processes = Column(Text)
+    cell_process_category = Column(String(200))
+    cell_process_response_type = Column(String(200))
+    species = Column(String(200), index=True)
+    necessary_condition = Column(String(500))
+    experimental_concentration = Column(String(200))
+    experimental_perturbation = Column(String(500))
+    experimental_readout = Column(String(500))
+    experimental_readout_category = Column(String(200))
+    experimental_system_type = Column(String(200))
+    experimental_system_details = Column(Text)
+    experimental_time_point = Column(String(200))
+    causality_type = Column(String(200))
+    causality_description = Column(Text)
+    publication_type = Column(String(200))
+    mapped_citation_id = Column(String(200))
+    url = Column(String(200))
 
 # Pydantic models
 class InteractionResponse(BaseModel):
@@ -49,7 +107,10 @@ class FilterOptions(BaseModel):
     values: List[str]
 
 # FastAPI app
-app = FastAPI(title="Cytokine Knowledgebase API", version="1.0.0")
+app = FastAPI(
+    title="Cytokine Knowledgebase API",
+    version="1.0.0"
+)
 
 # CORS middleware
 app.add_middleware(
@@ -68,17 +129,6 @@ def get_db():
     finally:
         db.close()
 
-# All available columns
-ALL_COLUMNS = [
-    "cytokine_name",
-    "cell_type",
-    "cytokine_effect",
-    "causality_type",
-    "species",
-    "chunk_id",
-    "key_sentences",
-    "citation_id"
-]
 
 @app.get("/")
 def root():
@@ -89,14 +139,13 @@ def get_interactions(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=500),
     fields: Optional[str] = Query(None, description="Comma-separated list of fields to return"),
-    # Filter parameters
     cytokine_name: Optional[str] = None,
     cell_type: Optional[str] = None,
     species: Optional[str] = None,
+    regulated_genes: Optional[str] = None,
     causality_type: Optional[str] = None,
     experimental_system_type: Optional[str] = None,
     publication_type: Optional[str] = None,
-    # Search parameter
     search: Optional[str] = Query(None, description="Search across key fields")
 ):
     with get_db() as db:
@@ -118,30 +167,29 @@ def get_interactions(
             query = query.filter(CytokineInteraction.causality_type.ilike(f"%{causality_type}%"))
             filters['causality_type'] = causality_type
         if experimental_system_type:
-            # This column is no longer in ALL_COLUMNS, so only filter if it exists in DB
-            if hasattr(CytokineInteraction, "experimental_system_type"):
-                query = query.filter(CytokineInteraction.experimental_system_type.ilike(f"%{experimental_system_type}%"))
+            query = query.filter(CytokineInteraction.experimental_system_type.ilike(f"%{experimental_system_type}%"))
             filters['experimental_system_type'] = experimental_system_type
         if publication_type:
-            if hasattr(CytokineInteraction, "publication_type"):
-                query = query.filter(CytokineInteraction.publication_type.ilike(f"%{publication_type}%"))
+            query = query.filter(CytokineInteraction.publication_type.ilike(f"%{publication_type}%"))
             filters['publication_type'] = publication_type
-        
-        # Global search only on available columns
+        if regulated_genes:
+            query = query.filter(CytokineInteraction.regulated_genes.ilike(f"%{regulated_genes}%"))
+            filters["regulated_genes"] = regulated_genes
+
         if search:
             search_filter = or_(
                 CytokineInteraction.cytokine_name.ilike(f"%{search}%"),
                 CytokineInteraction.cell_type.ilike(f"%{search}%"),
                 CytokineInteraction.cytokine_effect.ilike(f"%{search}%"),
-                CytokineInteraction.species.ilike(f"%{search}%")
+                CytokineInteraction.species.ilike(f"%{search}%"),
+                CytokineInteraction.regulated_genes.ilike(f"%{search}%")
             )
             query = query.filter(search_filter)
             filters['search'] = search
-        
-        # Get total count
+
         total = query.count()
-        
-        # Apply pagination
+
+        # pagination
         offset = (page - 1) * limit
         results = query.offset(offset).limit(limit).all()
         
@@ -195,21 +243,6 @@ def get_columns():
     """Get all available columns"""
     return {"columns": ALL_COLUMNS}
 
-@app.get("/api/stats")
-def get_stats():
-    """Get database statistics"""
-    with get_db() as db:
-        total = db.query(func.count(CytokineInteraction.id)).scalar()
-        unique_cytokines = db.query(func.count(func.distinct(CytokineInteraction.cytokine_name))).scalar()
-        unique_cell_types = db.query(func.count(func.distinct(CytokineInteraction.cell_type))).scalar()
-        unique_species = db.query(func.count(func.distinct(CytokineInteraction.species))).scalar()
-        
-        return {
-            "total_interactions": total,
-            "unique_cytokines": unique_cytokines,
-            "unique_cell_types": unique_cell_types,
-            "unique_species": unique_species
-        }
 
 if __name__ == "__main__":
     import uvicorn

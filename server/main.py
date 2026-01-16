@@ -21,11 +21,10 @@ if not SUPABASE_DB_URL:
 
 engine = create_engine(
     SUPABASE_DB_URL,
-    pool_size=20,          # scale-friendly
+    pool_size=20,
     max_overflow=40,
     pool_timeout=30,
     pool_recycle=1800,
-    # connect_args={"sslmode": "require"}
 )
 
 SessionLocal = sessionmaker(
@@ -36,6 +35,39 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+
+ALL_COLUMNS = [
+    "id",
+    "chunk_id",
+    "key_sentences",
+    "cell_type",
+    "cytokine_name",
+    "confidence_score",
+    "cytokine_effect",
+    "cytokine_effect_original",
+    "regulated_genes",
+    "gene_response_type",
+    "regulated_pathways",
+    "pathway_response_type",
+    "regulated_cell_processes",
+    "cell_process_category",
+    "cell_process_response_type",
+    "species",
+    "necessary_condition",
+    "experimental_concentration",
+    "experimental_perturbation",
+    "experimental_readout",
+    "experimental_readout_category",
+    "experimental_system_type",
+    "experimental_system_details",
+    "experimental_time_point",
+    "causality_type",
+    "causality_description",
+    "publication_type",
+    "mapped_citation_id",
+    "url"
+]
+
 # Database Model
 class CytokineInteraction(Base):
     __tablename__ = "cytokine_effects"
@@ -44,9 +76,7 @@ class CytokineInteraction(Base):
     chunk_id = Column(String(200))
     key_sentences = Column(Text)
     cell_type = Column(String(500), index=True)
-    cell_type_id = Column(String(200))
     cytokine_name = Column(String(200), index=True)
-    cytokine_name_original = Column(String(200))
     confidence_score = Column(Float)
     cytokine_effect = Column(String(500))
     cytokine_effect_original = Column(String(500))
@@ -54,25 +84,23 @@ class CytokineInteraction(Base):
     gene_response_type = Column(String(200))
     regulated_pathways = Column(Text)
     pathway_response_type = Column(String(200))
-    regulated_proteins = Column(Text)
-    protein_response_type = Column(String(200))
+    regulated_cell_processes = Column(Text)
+    cell_process_category = Column(String(200))
+    cell_process_response_type = Column(String(200))
     species = Column(String(200), index=True)
     necessary_condition = Column(String(500))
     experimental_concentration = Column(String(200))
     experimental_perturbation = Column(String(500))
     experimental_readout = Column(String(500))
-    experimental_readout_original = Column(String(500))
-    experimental_system = Column(String(500))
-    experimental_system_details = Column(Text)
-    experimental_system_original = Column(String(500))
+    experimental_readout_category = Column(String(200))
     experimental_system_type = Column(String(200))
+    experimental_system_details = Column(Text)
     experimental_time_point = Column(String(200))
-    regulated_cell_processes = Column(Text)
-    regulated_cell_processes_original = Column(Text)
     causality_type = Column(String(200))
     causality_description = Column(Text)
     publication_type = Column(String(200))
     mapped_citation_id = Column(String(200))
+    url = Column(String(200))
 
 # Pydantic models
 class InteractionResponse(BaseModel):
@@ -113,42 +141,6 @@ def get_db():
     finally:
         db.close()
 
-ALL_COLUMNS = [
-    "id",
-    "chunk_id",
-    "key_sentences",
-    "cell_type",
-    "cell_type_id",
-    "cytokine_name",
-    "cytokine_name_original",
-    "confidence_score",
-    "cytokine_effect",
-    "cytokine_effect_original",
-    "regulated_genes",
-    "gene_response_type",
-    "regulated_pathways",
-    "pathway_response_type",
-    "regulated_proteins",
-    "protein_response_type",
-    "species",
-    "necessary_condition",
-    "experimental_concentration",
-    "experimental_perturbation",
-    "experimental_readout",
-    "experimental_readout_original",
-    "experimental_system",
-    "experimental_system_details",
-    "experimental_system_original",
-    "experimental_system_type",
-    "experimental_time_point",
-    "regulated_cell_processes",
-    "regulated_cell_processes_original",
-    "causality_type",
-    "causality_description",
-    "publication_type",
-    "mapped_citation_id",
-]
-
 
 @app.get("/")
 def root():
@@ -162,7 +154,10 @@ def get_interactions(
     cytokine_name: Optional[str] = None,
     cell_type: Optional[str] = None,
     species: Optional[str] = None,
+    regulated_genes: Optional[str] = None,
     causality_type: Optional[str] = None,
+    experimental_system_type: Optional[str] = None,
+    publication_type: Optional[str] = None,
     search: Optional[str] = None,
 ):
     with get_db() as db:
@@ -172,18 +167,24 @@ def get_interactions(
         if cytokine_name:
             query = query.filter(CytokineInteraction.cytokine_name.ilike(f"%{cytokine_name}%"))
             filters["cytokine_name"] = cytokine_name
-
         if cell_type:
             query = query.filter(CytokineInteraction.cell_type.ilike(f"%{cell_type}%"))
             filters["cell_type"] = cell_type
-
         if species:
             query = query.filter(CytokineInteraction.species.ilike(f"%{species}%"))
             filters["species"] = species
-
         if causality_type:
             query = query.filter(CytokineInteraction.causality_type.ilike(f"%{causality_type}%"))
             filters["causality_type"] = causality_type
+        if experimental_system_type:
+            query = query.filter(CytokineInteraction.experimental_system_type.ilike(f"%{experimental_system_type}%"))
+            filters['experimental_system_type'] = experimental_system_type
+        if publication_type:
+            query = query.filter(CytokineInteraction.publication_type.ilike(f"%{publication_type}%"))
+            filters['publication_type'] = publication_type
+        if regulated_genes:
+            query = query.filter(CytokineInteraction.regulated_genes.ilike(f"%{regulated_genes}%"))
+            filters["regulated_genes"] = regulated_genes
 
         if search:
             query = query.filter(
@@ -192,11 +193,14 @@ def get_interactions(
                     CytokineInteraction.cell_type.ilike(f"%{search}%"),
                     CytokineInteraction.cytokine_effect.ilike(f"%{search}%"),
                     CytokineInteraction.species.ilike(f"%{search}%"),
+                    CytokineInteraction.regulated_genes.ilike(f"%{search}%"),
                 )
             )
             filters["search"] = search
 
         total = query.count()
+
+        # pagination
         offset = (page - 1) * limit
         results = query.offset(offset).limit(limit).all()
 
